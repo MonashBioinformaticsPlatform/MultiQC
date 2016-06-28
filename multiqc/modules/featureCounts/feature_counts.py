@@ -38,13 +38,14 @@ class MultiqcModule(BaseMultiqcModule):
         # Write parsed report data to a file
         self.write_data_file(self.featurecounts_data, 'multiqc_featureCounts')
 
-        # Basic Stats Table
-        # Report table is immutable, so just updating it works
-        self.featurecounts_stats_table()
+        for f in self.featurecounts_data:
+            # Basic Stats Table
+            # Report table is immutable, so just updating it works
+            self.featurecounts_stats_table(f)
 
-        # Assignment bar plot
-        # Only one section, so add to the intro
-        self.intro += self.featureCounts_chart()
+            # Assignment bar plot
+            # Only one section, so add to the intro
+            self.intro += self.featureCounts_chart(f)
 
 
     def parse_featurecounts_report (self, f):
@@ -86,19 +87,22 @@ class MultiqcModule(BaseMultiqcModule):
             
             # Add to the main dictionary
             if len(data) > 1:
+                file_stem = f['s_name']
                 if s_name in self.featurecounts_data:
                     log.debug("Duplicate sample name found! Overwriting: {}".format(s_name))
                 self.add_data_source(f, s_name)
-                self.featurecounts_data[s_name] = data
+                if file_stem not in self.featurecounts_data:
+                    self.featurecounts_data[file_stem] = {}
+                self.featurecounts_data[file_stem][s_name] = data
         
 
-    def featurecounts_stats_table(self):
+    def featurecounts_stats_table(self,f):
         """ Take the parsed stats from the featureCounts report and add them to the
         basic stats table at the top of the report """
         
         headers = OrderedDict()
         headers['percent_assigned'] = {
-            'title': '% Assigned',
+            'title': '% Assigned : '+f,
             'description': '% Assigned reads',
             'max': 100,
             'min': 0,
@@ -107,25 +111,25 @@ class MultiqcModule(BaseMultiqcModule):
             'format': '{:.1f}%'
         }
         headers['Assigned'] = {
-            'title': 'M Assigned',
+            'title': 'M Assigned : '+f,
             'description': 'Assigned reads (millions)',
             'min': 0,
             'scale': 'PuBu',
             'modify': lambda x: float(x) / 1000000,
             'shared_key': 'read_count'
         }
-        self.general_stats_addcols(self.featurecounts_data, headers)
+        self.general_stats_addcols(self.featurecounts_data[f], headers)
 
 
-    def featureCounts_chart (self):
+    def featureCounts_chart (self,f):
         """ Make the featureCounts assignment rates plot """
         
         # Config for the plot
         config = {
-            'id': 'featureCounts_assignment_plot',
-            'title': 'featureCounts Assignments',
+            'id': 'featureCounts_assignment_plot_'+f,
+            'title': 'featureCounts Assignments : '+f,
             'ylab': '# Reads',
             'cpswitch_counts_label': 'Number of Reads'
         }
         
-        return plots.bargraph.plot(self.featurecounts_data, self.featurecounts_keys, config)
+        return plots.bargraph.plot(self.featurecounts_data[f], self.featurecounts_keys, config)
